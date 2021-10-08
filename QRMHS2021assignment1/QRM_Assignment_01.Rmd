@@ -1,0 +1,54 @@
+---
+title: "QRM_Assignment_01"
+output:
+  html_document:
+    df_print: paged
+---
+
+## import relevant libraries
+```{r Test, echo=FALSE}
+library("readxl")
+library("ggplot2")
+library("dplyr")
+```
+
+```{r}
+car_data <- read_excel("QRMassignment20211008.xlsx")
+#View(car_data)
+
+#a)
+
+ggplot(data = car_data, aes(x = Prices, fill = group)) +
+  geom_histogram(mapping = aes(Price), bins = 30, col = "lightblue", fill = "lightblue") +
+  geom_vline(mapping = aes(xintercept = mean(Price), colour = "Mean of Prices"), col = "grey") +
+  geom_vline(mapping = aes(xintercept = median(Price), colour = "Median of Prices"), col = "black") +
+  scale_fill_manual(name="Legend",values=c("grey","black"),labels=c("Mean of Prices","Median of Prices")) +
+  labs(title = "Histogram of Prices")
+  
+###some explaining words here
+
+
+
+
+#b)
+
+car_small_cyl_vol <- car_data %>% filter(Liter < 3)
+car_large_cyl_vol <- car_data %>% filter(Liter > 3)
+
+  ### check whether below and above 3 liters includes all observations
+  identical(nrow(car_small_cyl_vol)+nrow(car_large_cyl_vol),nrow(car_data))
+  ##returns FALSE; hence it does not include all observations
+  
+  ### Cars with exactly 3 liters cylinder volume should be excluded after the constraints given in the exercise
+  car_between_cyl_vol <- car_data %>% filter(Liter == 3)
+  
+  ### including 3 liter culinder volume cars as well yields the identical lenth of datasets
+  identical(nrow(car_small_cyl_vol)+nrow(car_large_cyl_vol)+nrow(car_between_cyl_vol),nrow(car_data))
+
+my_small <- car_small_cyl_vol$Liter
+my_large <- car_large_cyl_vol$Liter
+
+```
+
+
+
