@@ -1,0 +1,1592 @@
+---
+title: "Stock & Watson (2015): Empirical exercises"
+author: "Michael Massmann"
+date: "version 5: 27th March 2020"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    includes:
+      before_body: defs.html
+---
+
+```{r include=FALSE}
+library(knitr)
+options(digits=3, scipen=5)
+opts_chunk$set(echo=TRUE,
+               eval=TRUE,
+               fig.align='center',
+               comment="",
+               message=FALSE,
+               warning=FALSE,
+               cache=TRUE#,
+               ## tidy=TRUE, # switch on tidying of code
+               ## tidy.opts=list(comment=FALSE) # in particular, do not print comment lines in code
+               )
+```
+
+
+
+# Chapter 4 
+
+## Empirical Exercises 
+
+### Exercise E4.1
+
+Load the dataset.
+```{r echo=1:2}
+library(readxl)
+Growth <- read_excel("../StockWatson/Growth.xlsx")
+## the loaded dataset can be viewed as follows:
+## View(Growth)
+```
+
+#### Part a.
+Plot `tradeshare` against `growth`, adding labels. Note that the dollar sign syntax `Growth$tradeshare` accesses the variable of the database without saving it first in memory.
+```{r}
+plot(Growth$tradeshare, Growth$growth, ylab="growth", xlab="tradeshare")
+```
+Clearly, there appears to be a weak positive relationship. But does that impression maybe hinge on the outlying observation at the top-right of the plot?
+
+
+#### Part b.
+The outlying observation with a trade share of 2 is Malta.
+
+
+#### Part c.
+Estimate a linear model by OLS and show the results. Again, the syntax is noteworthy: since `lm` allows the database to be given as argument such that its variables can be accessed
+directly, i.e. without the dollar sign syntax. Note also that in the output table the columns labelled "Std. Error", "t value" and "Pr(>|t|)" are produced as a matter of
+course, yet may in fact be inappropriate for the model at hand; this will be discussed later.
+```{r} 
+modelE4.1c <- lm(growth ~ tradeshare, data=Growth)
+summary(modelE4.1c)
+```
+The sample regression is thus 
+$$
+    \widehat{\growth} = `r modelE4.1c$coefficients[[1]]` + `r modelE4.1c$coefficients[[2]]` \times \tradeshare 
+$$    
+such that, for $\tradeshare = 0.50$, $\widehat{\growth} = `r modelE4.1c$coefficients[[1]] + modelE4.1c$coefficients[[2]] * 0.5`$ and, for $\tradeshare = 1.00$,
+$\widehat{\growth} = `r modelE4.1c$coefficients[[1]] + modelE4.1c$coefficients[[2]] * 1`$.
+
+
+#### Part d.
+Define a new dataset `Growth1` by deleting the observation of Malta. Estimate the model again, using the new dataset as specified by the `data` argument.
+```{r}
+Growth1 <- Growth[Growth$country_name != 'Malta',]
+modelE4.1d <- lm(growth ~ tradeshare, data=Growth1)
+summary(modelE4.1d)
+```
+The sample regression line is now:
+$$
+    \widehat{\growth} = `r modelE4.1d$coefficients[[1]]` + `r modelE4.1d$coefficients[[2]]`  \times \tradeshare
+$$
+such that, for $\tradeshare = 0.50$, $\widehat{\growth} = `r modelE4.1d$coefficients[[1]] + modelE4.1d$coefficients[[2]] * 0.50`$ and, for $\tradeshare = 1.00$, 
+$\widehat{\growth} = `r modelE4.1d$coefficients[[1]] + modelE4.1d$coefficients[[2]]`$.
+
+Add the  two sample regressions to the scatter plot for comparison:
+```{r eval=TRUE, echo=-1}
+plot(Growth$tradeshare, Growth$growth, ylab="growth", xlab="tradeshare")
+abline(modelE4.1c, col="red")
+abline(modelE4.1d, col="blue")
+```
+
+#### Part e.
+Malta is a freight transport site, which explains its large "trade share".  Many goods coming into Malta and are immediately transported to other countries. Thus, Malta's imports and exports are unlike those of most other
+countries; it should not be included in the analysis.
+
+
+
+### Exercise E4.2 
+
+Load the dataset and save the variables of interest in memory.
+```{r eval=-3, echo=-3}
+library(readxl)
+EnH <- read_excel("../StockWatson/Earnings_and_Height.xlsx")
+View(EnH)
+height <-EnH$height
+earnings <- EnH$earnings
+```
+
+#### Part a. 
+```{r}
+median(height)
+```
+The median height in the sample is 67 inches.
+  
+
+#### Part b.
+The sample can be restricted to those individuals whose height is smaller than 67 inches:
+```{r}
+earningsSmall <- earnings[height <= 67]
+earningsTall <- earnings[height > 67]
+mean(earningsSmall)
+mean(earningsTall)
+```
+To compare small and tall individuals, construct a dummy variable that takes value 1 for small individuals and value 0 for tall ones. Regress earnings on that dummy variables.
+```{r}
+D <- ifelse(height <= 67, 1, 0)
+modelE4.2b <- lm(earnings ~ D)
+```
+Load the `sandwich` package for computing heteroscedasticity-robust, or heteroscedasticity-consistent, standard errors (`HC1`) and package `lmtest` for the output table.
+```{r}
+library(sandwich)
+library(lmtest)
+cov <- vcovHC(modelE4.2b, type = "HC1")
+coeftest(modelE4.2b, vcov = cov)
+```
+The estimated average annual earnings for shorter workers are \$`r modelE4.2b$coefficients[[1]] + modelE4.2b$coefficients[[2]]` and \$`r modelE4.2b$coefficients[[1]]`
+for taller workers, with a difference of \$`r modelE4.2b$coefficients[[2]] * (-1)`.  The difference is large, indeed more than 10\% of average annual earnings, and significantly
+different from 0. 
+
+The estimated model's coefficients can be accessed via `modelE4.2b$coefficients`. The estimated covariance of the estimators was defined above to be `cov`, such that the square
+root of its of its diagonal elements are the standard errors. Quantiles of the standard normal distribution are obtained by `qnorm`. Consequently, the bounds of the 95% confidence
+interval for the difference are computed to be:
+```{r echo=-3}
+lbound <- modelE4.2b$coefficients[2] - qnorm(0.975)*sqrt(diag(cov))[2]
+ubound <- modelE4.2b$coefficients[2] + qnorm(0.975)*sqrt(diag(cov))[2]
+cbind(lbound, ubound)
+```
+
+#### Part c.
+The following shows the scatterplot of height vs earnings. 
+```{r echo=FALSE}
+plot(height, earnings, ylab="Earnings", xlab="Height", col="blue")
+```
+Individual earnings were reported in 23 brackets, and a single average value is reported for earnings in the same bracket.  Thus, the dataset contains only 23 distinct values of
+earnings. Moreover, height is measured in whole inches. The `jitter` function is useful to illustrate the sheer number of observations.
+```{r}
+plot(jitter(height), jitter(earnings), ylab="Earnings", xlab="Height", col="blue")
+```
+ 
+
+
+#### Part d.
+Estimation of the regression yields
+```{r}
+modelE4.2d <- lm(earnings ~ height) 
+cov <- vcovHC(modelE4.2d, type = "HC1")
+coeftest(modelE4.2d, vcov = cov)
+```
+The estimated regression is thus
+$$
+\widehat{\earnings} = `r modelE4.2d$coefficients[[1]]` + `r modelE4.2d$coefficients[[2]]` \times \height.
+$$
+Predicted earnings for workers who are 65 inches, 67 inches and 70 inches tall are
+$$
+\begin{align}
+\widehat{\earnings} &= `r modelE4.2d$coefficients[[1]] + modelE4.2d$coefficients[[2]] * 65` \ (\$/in) \\
+\widehat{\earnings} &= `r modelE4.2d$coefficients[[1]] + modelE4.2d$coefficients[[2]] * 67` \ (\$/in) \\
+\widehat{\earnings} &= `r modelE4.2d$coefficients[[1]] + modelE4.2d$coefficients[[2]] * 70` \ (\$/in)
+\end{align}
+$$
+respectively.
+
+The $R^2$ and the SER, available via the `summary` function, are given by
+```{r echo=-3}
+R2 <- summary(modelE4.2d)$r.squared
+SER <- summary(modelE4.2d)$sigma
+cbind(R2, SER)
+```
+
+
+#### Part e.
+The estimated regression in Part d, with units shown, is
+$$
+\widehat{\earnings} \ (\$) = `r modelE4.2d$coefficients[[1]]` \ (\$) + `r modelE4.2d$coefficients[[2]]` \ (\$/in) \times \height \ (in)
+$$
+The $R^2$ is unit-free and the SER is also measured in dollars.
+
+
+Recall that $1 \ cm = 0.394 \ in$. Then
+$$
+`r modelE4.2d$coefficients[[2]]` \ (\$/in) = `r modelE4.2d$coefficients[[2]]` \ (\$/in) \times 0.394 \ (in/cm) = `r modelE4.2d$coefficients[[2]] * 0.394` \ (\$/cm)
+$$
+so the regression can be transformed into:
+$$
+\widehat{\earnings} \ (\$) = `r modelE4.2d$coefficients[[1]]` \ (\$) + `r modelE4.2d$coefficients[[2]] * 0.394` \ (\$/cm) \times \height \ (cm)
+$$
+The $R^2$ and the SER are unchanged.
+
+
+#### Part f.
+Create a subset of the dataset comprising only those observations whose value of the variable `sex` is 0, i.e. the female respondants.
+```{r}
+EnH_female <- subset(EnH, EnH$sex == "0")
+```
+Now regress earnings on height. Note that by including the `data` argument in `lm`, the variables `earnings` and `height` can be accessed directly.
+```{r}
+modelE4.2f <- lm(earnings ~ height, data = EnH_female)
+cov <- vcovHC(modelE4.2f, type = "HC1")
+coeftest(modelE4.2f, vcov = cov)
+```
+The sample regression for females is thus
+$$
+\widehat{\earnings} = `r modelE4.2f$coefficients[[1]]` + `r modelE4.2f$coefficients[[2]]` \times \height
+$$
+with $R^2$ and SER being by
+```{r echo=-3}
+R2 <- summary(modelE4.2f)$r.squared
+SER <- summary(modelE4.2f)$sigma
+cbind(R2, SER)
+```
+A women who is one inch taller than average is predicted to have earnings that are \$`r modelE4.2f$coefficients[[2]]` per year higher than average.
+
+
+#### Part g.
+The male subset of the data is created by
+```{r}
+EnH_male <- subset(EnH, EnH$sex == "1")
+```
+Regressing earnings on height:
+```{r}
+modelE4.2g <- lm(earnings ~ height, data = EnH_male)
+cov <- vcovHC(modelE4.2g, type = "HC1")
+coeftest(modelE4.2g, vcov = cov)
+```
+The estimated regression for males is thus
+$$
+\widehat{\earnings} = `r modelE4.2g$coefficients[[1]]`  + `r modelE4.2g$coefficients[[2]]` \times \height
+$$
+with $R^2$ and SER being by
+```{r echo=-3}
+R2 <- summary(modelE4.2g)$r.squared
+SER <- summary(modelE4.2g)$sigma
+cbind(R2, SER)
+```
+A man who is one inch taller than average is predicted to have earnings that are \$`r modelE4.2g$coefficients[[2]]` per year higher than average.
+
+
+#### Part h.
+Height may be correlated with other factors that cause earnings. For example, height may be correlated with "strength"; in some occupations, stronger workers can be more productive
+and therefore, earn more. In this case, the conditional mean of the $u_i$ for a given $X_i$ is not zero.
+
+
+
+# Chapter 5 
+
+## Empirical Exercises
+
+### Exercise E5.1 
+
+Load the data set of earnings and heights.
+```{r}
+library(readxl)
+EnH <- read_excel("../StockWatson/Earnings_and_Height.xlsx")
+```
+
+
+#### Part  a.
+
+Estimate the linear regresion of `earnings` on `heights` by OLS. Construct heteroscedasticity-robust standard errors using the `vcovHC` command of the  `sandwich` package. Print a summary table with `coeftest` of the `lmtest` package.
+
+```{r}
+library(lmtest)
+library(sandwich)
+modelE5.1a <- lm(earnings ~ height, data = EnH)
+cov <- vcovHC(modelE5.1a, type = "HC1")
+coeftest(modelE5.1a, vcov = cov)
+```
+
+The sample regression is:
+$$
+\widehat{\text{earnings}} = `r modelE5.1a$coefficients[[1]]` + `r modelE5.1a$coefficients[[2]]` \times \text{height}, \quad R^2 = `r summary(modelE5.1a)$r.squared`.
+$$
+A 95\% confidence interval for the coefficient of `height` can be constructed manually by saving the standard errors first:
+```{r}
+robseE5.1a <- sqrt(diag(cov))
+robseE5.1a
+
+```
+and then computing the lower and upper bounds:
+```{r}
+low <- coef(modelE5.1a) + qnorm(0.025)*robseE5.1a
+up <- coef(modelE5.1a) + qnorm(0.975)*robseE5.1a
+cbind(low, up)
+```
+The confidence interval for the slope is thus $`r low[[2]]` \leq \beta_1 \leq `r up[[2]]`$.
+
+
+#### Part  b.
+
+Create a subset of the data for women, then regress earnings on height.
+
+```{r}
+EnH_female <- subset(EnH, EnH$sex == "0")
+modelE5.1b <- lm(earnings ~ height, data = EnH_female)
+cov <- vcovHC(modelE5.1b, type = "HC1")
+coeftest(modelE5.1b, vcov = cov)
+```
+
+The regression for women is
+$$
+\widehat{\text{earnings}} = `r modelE5.1b$coefficients[[1]]` + `r modelE5.1b$coefficients[[2]]` \times \text{height},  \quad R^2 = `r summary(modelE5.1b)$r.squared`.
+$$
+and the 95% confidence intervals are
+
+```{r eval=TRUE, echo=FALSE}
+robseE5.1b <- sqrt(diag(cov))
+low <- coef(modelE5.1b) + qnorm(0.025)*robseE5.1b
+up <- coef(modelE5.1b) + qnorm(0.975)*robseE5.1b
+cbind(low, up)
+```
+i.e.  $`r low[[2]]` \leq \beta_{1,\text{female}} \leq `r up[[2]]`$. This interval does not include the value 0, so the estimated
+slope is significantly different from 0 at the 5% level.
+
+
+#### Part  c.
+
+Create a subset of the data for men, then regress earnings on height,
+
+```{r}
+EnH_male <- subset(EnH, EnH$sex == "1")
+modelE5.1c <- lm(earnings ~ height, data = EnH_male)
+cov <- vcovHC(modelE5.1c, type = "HC1")
+coeftest(modelE5.1c, vcov = cov)
+```
+
+The regression for males is thus
+$$
+\widehat{\text{earnings}} = `r modelE5.1c$coefficients[[1]]` + `r modelE5.1c$coefficients[[2]]` \times \text{height}, \quad R^2 = `r summary(modelE5.1c)$r.squared`.
+$$
+and the 95% confidence intervals are
+
+```{r eval=TRUE, echo=FALSE}
+robseE5.1c <- sqrt(diag(cov))
+low <- coef(modelE5.1c) + qnorm(0.025)*robseE5.1c
+up <- coef(modelE5.1c) + qnorm(0.975)*robseE5.1c
+cbind(low, up)
+```
+
+i.e. $`r low[[2]]` \leq \beta_{1,\text{male}} \leq `r up[[2]]`$. This interval does not include 0, so the estimated slope is significantly different than 0 at the 5% level.
+
+
+#### Part  d.
+
+Define the difference between the two slopes as
+$$
+d_1 = \beta_{1, \text{male}} - \beta_{1, \text{female}}.
+$$
+The null hypothesis is hence 
+$$
+H_0 : d_1 = 0
+$$
+and the corresponding t-statistic
+$$
+t = \frac{\hat d_1}{\SE( \hat d_1 )}.
+$$
+The standard error can be computed as
+$$
+\SE( \hat d_1 ) = \SE ( \hat \beta_{1,\text{male}} - \hat \beta_{1,\text{female}} ) = \sqrt{ \widehat{\Var}( \hat \beta_{1, \text{male}} ) + \widehat{\Var} ( \hat \beta_{1, \text{female}} ) } =  \sqrt{ \SE(\hat \beta_{1, \text{male}})^2 + \SE(\hat \beta_{1, \text{female}})^2 }
+$$
+since $\Cov (\hat \beta_{1,\text{male}} , \hat \beta_{1,\text{female}} ) = 0$. Using the estimates of Parts b. and c. yields
+$$
+\begin{align*}
+\hat d_1  & = \hat \beta_{1, \text{male}} - \hat \beta_{1, \text{female}} = `r modelE5.1c$coefficients[[2]] - modelE5.1b$coefficients[[2]]`  \\
+\SE (\hat d_1) &= \sqrt{ \SE(\hat \beta_{1, \text{male}})^2 + \SE (\hat \beta_{1, \text{female}})^2 } = `r sqrt(robseE5.1c[[2]]^2 + robseE5.1b[[2]]^2)`.
+\end{align*}
+$$
+
+The 95% confidence interval for $\beta_{1, \text{male}} - \beta_{1, \text{female}}$ is hence
+$$
+`r modelE5.1c$coefficients[[2]] - modelE5.1b$coefficients[[2]] + qnorm(0.025) * sqrt(robseE5.1c[[2]]^2 + robseE5.1b[[2]]^2)` \leq \beta_{1, \text{male}} - \beta_{1, \text{female}} \leq `r modelE5.1c$coefficients[[2]] - modelE5.1b$coefficients[[2]] + qnorm(0.975) * sqrt(robseE5.1c[[2]]^2 + robseE5.1b[[2]]^2)`
+$$
+This interval does not include the value zero, so the estimated difference in the slopes is significantly different from 0 at the 5% level.
+
+
+#### Part  e.
+We can also subset the data for some specific occupations and examine a linear relationship between `earnings` and `height`. For executives/managers, coded as `occupation == 1`,
+```{r}
+EnH_Exec <- subset(EnH, EnH$occupation == 1)
+modelE5.1e <- lm(earnings ~ height, data = EnH_Exec)
+cov <- vcovHC(modelE5.1e, type = "HC1")
+coeftest(modelE5.1e, vcov = cov)
+```
+while for transport, coded as `occupation == 14`,
+```{r echo=FALSE}
+EnH_Trans <- subset(EnH, EnH$occupation == 14)
+modelE5.1e <- lm(earnings ~ height, data = EnH_Trans)
+cov <- vcovHC(modelE5.1e, type = "HC1")
+coeftest(modelE5.1e, vcov = cov)
+```
+
+The predicted effect of height on earnings appears larger for occupations that require more strength than for others. That said, the estimated effect of height on earning is both large and statistically significant in several
+occupations in which strength would not seem to have a large effect on productivity.
+
+
+
+### Exercise E5.2
+
+Load the `Growth` data and delete the outlier by removing the 65th row of the dataframe. Save the `tradeshare` and `growth` variables in memory.
+```{r loadgrowth}
+library(readxl)
+Growth <- read_excel("../StockWatson/Growth.xlsx")
+Growth1 <- Growth[-65,]
+tradeshare <- Growth1$tradeshare
+growth <- Growth1$growth
+```
+
+#### Part a.
+
+Estimate the linear regression model and compute heteroscedasticity-robust standard errors.
+
+```{r linreg}
+modelE5.2a <- lm(growth ~ tradeshare)
+library(sandwich)
+library(lmtest)
+robust <- coeftest(modelE5.2a, vcov = vcovHC(modelE5.2a, type = "HC1"))
+robust
+```
+The t-statistic for the slope is `r robust[2,3]`, larger in absolute value that the 10% critical value, namely `r qnorm(0.95)`, but less than the 5% and 1% critical values, i.e. `r qnorm(0.975)` and `r qnorm(0.995)`. Therefore the null hypothesis is rejected at the 10% significance
+level, but not at the 5% or 1% levels.
+
+
+#### Part b.
+The p-value is `r robust[[2,4]]`.
+
+
+#### Part c.
+
+Extract the estimated slope coefficient as well as the corresponding standard error from summary output and construct a 90% confidence interval, using the 95th percentile of the standard Normal distribution.
+```{r}
+betahat1 <- robust[2,1] # extract information from summary output
+SE1 <- robust[2,2]
+crit <- qnorm(0.95)
+c(betahat1 - crit*SE1, betahat1 + crit*SE1)
+```
+
+
+
+### Exercise E5.3
+
+Load the data of `birthweight_smoking` data. Save the `birthweight` and `smoker` variables in memory to make the notation less cumbersome.
+
+```{r eval=-5, echo=-5}
+library(readxl)
+birth_smoke <- read_xlsx("../StockWatson/birthweight_smoking.xlsx")
+birthweight <- birth_smoke$birthweight
+smoker <- birth_smoke$smoker
+View(birth_smoke)
+```
+
+
+#### Part a.
+
+The unconditional average of `birthweight` is straightforward to compute. The average conditional on the `smoker` variable having value 1 or 0 can be obtained by first finding the subset of values of `birthweight` for
+which `smoker == 1` or `smoker == 0`, respectively.
+
+```{r}
+mean <- mean(birthweight)
+mean_smoker <- mean(birthweight[smoker == 1])
+mean_nonsmoker <- mean(birthweight[smoker == 0])
+```
+
+The standard errors of the averages are computed in the standard fashion: For i.i.d. random variables $X_i$, $i = 1, \ldots, n$, with variance $\sigma^2_X$, the standard error of $\bar X = \frac{1}{n} \sum_{i = 1}^n X_i$ is given
+by $$ \textsf{SE} (\bar X) = \frac{\sigma_X}{\sqrt{n}}, $$ i.e. the standard deviation of $X$ divided by $\sqrt{n}$. A table of all summary statistics can be constructed neatly as `data.frame`, including column and row
+labels.
+
+```{r}
+n <- length(birthweight)
+se <- sd(birthweight) /  sqrt(n)
+
+n_smoker <- length(birthweight[smoker == 1])
+se_smoker <- sd(birthweight[smoker == 1]) / sqrt(n_smoker)
+
+n_nonsmoker <- length(birthweight[smoker == 0])
+se_nonsmoker <- sd(birthweight[smoker == 0]) / sqrt(n_nonsmoker)
+
+data.frame(all=c(mean, se, n),
+           smoker=c(mean_smoker, se_smoker, n_smoker),
+           non_smoker=c(mean_nonsmoker, se_nonsmoker, n_nonsmoker),
+           row.names=c("mean", "se", "n"))
+
+```
+
+Note that similar information is computed automatically by, for instance, the `describeBy` function of the `psych` package.
+
+```{r}
+library(psych)
+describeBy(birthweight, group = smoker, range = FALSE, skew = FALSE)
+```
+
+
+#### Part b.
+
+Compute now the difference in average birth weights for smoking and non-smoking mothers, as well as the corresponding standard error.
+
+```{r}
+diff <- mean_smoker - mean_nonsmoker
+se_diff <- sqrt(se_smoker^2 + se_nonsmoker^2)
+```
+
+The difference is hence given by $`r diff`$.  The standard error of the difference is $`r se_diff`$. The 95% confidence interval for the difference is $[`r diff - qnorm(0.975)*se_diff` , `r diff + qnorm(0.975)*se_diff`]$.
+
+ 
+ 
+#### Part c.
+
+Estimate a linear regression of `birthweight` on `smoker` using OLS. Assume that the error terms are homoscedastic.
+
+```{r}
+modelE5.3c <- lm(birthweight ~ smoker)
+summary(modelE5.3c)
+```
+
+The estimated regression is
+$$
+    \widehat{\birthweight}  = \estse{`r modelE5.3c$coefficients[[1]]`}{`r summary(modelE5.3c)$coefficients[1,2]`} - \estse{`r -modelE5.3c$coefficients[[2]]`}{`r summary(modelE5.3c)$coefficients[2,2]`} \times \smoker.
+$$
+
+The intercept is the average birthweight for non-smokers. The slope is the difference between average birthweights for smokers and non-smokers. The standard errors are the same, so that the confidence interval is identical to that in Part b.
+<!-- Note that there are in fact tiny differences in the standard errors. Why? -->
+
+
+
+#### Part d.
+
+It is likely that there are other factors causing low birth weight, and some of those could be related to smoking habits. One example is stress.
+
+
+
+
+
+
+# Chapter 6
+
+## Empirical Exercises
+
+
+### Exercise E6.1
+
+Load the data.
+```{r eval=-3, echo=-3}
+library(readxl)
+db <- read_xlsx("../StockWatson/birthweight_smoking.xlsx")
+View(db)
+```
+
+#### Part a.
+
+```{r}
+library(lmtest)
+library(sandwich)
+modelE6.1a <- lm(birthweight ~ smoker, data = db)
+coeftest(modelE6.1a, vcov = vcovHC(modelE6.1a, type = "HC1"))
+```
+According to this model, smoking reduces birth weight by $`r - modelE6.1a$coefficients[[2]]`$ grams, on average.
+
+
+
+#### Part b.
+
+Smoking may be correlated with both alcohol and the number of pre-natal doctor visits, thus satisfying (1) in Key Concept 6.1.  Moreover, both alcohol consumption and the number of doctor visits may have their own independent
+effects on birthweight, thus satisfying (2) in Key Concept 6.1. Excluding `alcohol` and `nprevist` from the model could hence lead to omitted variable bias.
+
+```{r}
+modelE6.1b <- lm(birthweight ~ smoker + alcohol + nprevist, data =  db)
+coeftest(modelE6.1b, vcov = vcovHC(modelE6.1b, type = "HC1"))
+```
+The estimated coefficient is somewhat smaller: it has fallen to $`r - modelE6.1b$coefficients[[2]]`$ grams from $`r - modelE6.1a$coefficients[[2]]`$ grams, so the regression in Part a. may suffer from omitted variable bias. 
+
+Create now a data frame with $X$ values for an individual such as Jane that smoked during pregnancy, did not drink alcohol and had eight prenatal care visits. Use it for predicting the birth weight of that individual's child.
+```{r}
+new.db <- data.frame(smoker=1, alcohol=0, nprevist=8)
+Jane <- predict(modelE6.1b, new.db)
+```
+
+The birth weight of Jane's child is predicted to be $`r Jane`$ grams. The unadjusted $R^ 2$ is equal to $`r summary(modelE6.1b)$r.squared`$ while is adjusted $\bar R^2$ is $`r summary(modelE6.1b)$adj.r.squared`$. The two are nearly identical because the sample size $n$ is very large relative to the
+number $k$ of regressors.
+
+
+#### Part c.
+
+This part illustrates the Frisch-Waugh theorem.
+
+```{r echo=c(2:4,6:8,10:11)}
+## regress birthweight on alcohol and nprevist, and save residuals
+modelE6.1c1 <- lm(birthweight ~ alcohol + nprevist, data = db)
+bw_res <- residuals(modelE6.1c1)
+summary(modelE6.1c1)
+## regress smoker on alcohol and nprevist, and save residuals
+modelE6.1c2 <- lm(smoker ~ alcohol + nprevist, data = db) 
+smoker_res <- residuals(modelE6.1c2)
+summary(modelE6.1c2)
+## regress bw_res on smoker_res, omitting the constant term
+modelE6.1c3 <- lm(bw_res ~ -1 + smoker_res) 
+summary(modelE6.1c3)
+```
+
+
+#### Part d.
+```{r}
+modelE6.1d <- lm(birthweight ~ smoker + alcohol + tripre0 + tripre2 + tripre3, data = db)
+coeftest(modelE6.1d, vcov = vcovHC(modelE6.1d, type = "HC1"))
+```
+
+`Tripre1` is omitted to avoid perfect multicollinearity.  If it were included, R would arbitrarily exclude `Tripre3` as a result. Babies born to women who had no prenatal doctor visits (`Tripre0 = 1`) had birthweights that on
+average were `r modelE6.1d$coefficients[[4]]` grams lower than babies from others who saw a doctor during the first trimester (`Tripre1 = 1`). Babies born to women whose first doctor visit was during the second trimester (`Tripre2
+= 1`) had birthweights that on average were `r modelE6.1d$coefficients[[5]]` grams lower than babies from others who saw a doctor during the first trimester (`Tripre1 = 1`). Babies born to women whose first doctor visit was during
+the third trimester (`Tripre3 = 1`) had birthweights that on average were `r modelE6.1d$coefficients[[6]]` grams lower than babies from others who saw a doctor during the first trimester (`Tripre1 = 1`).
+
+
+
+
+
+### Exercise E6.2 
+
+Load the `Growth` dataset and exclude Malta from it:
+```{r eval=-4, echo=-4}
+library(readxl)
+Growth <- read_excel("../StockWatson/Growth.xlsx")
+Growth1 <- Growth[Growth$country_name != 'Malta',]
+View(Growth1)
+```
+
+
+#### Part a. 
+
+A neat table with summary statistics is available via the `describe` command of the `psych` package.
+```{r}
+library(psych)
+vars <- Growth1[,c("growth", "tradeshare", "yearsschool", "oil", "rev_coups", "assasinations", "rgdp60")]
+describe(vars, skew=FALSE)
+```
+The variable `growth` is measured in percent, `tradeshare` is a fraction of GDP, `yearsschoool` is measured in years, `oil` is a dummy variable, `rev_coups` and `assassinations` are count variables, and `rgdp60` is measured in US dollars.
+
+
+#### Part b.
+
+Estimate the linear regression using OLS. Remember to load the `lmtest` and `sandwich` packages for the summary table and heteroscedasticty-robust standard errors.
+
+```{r}
+library(lmtest)
+library(sandwich)
+modelE6.2b <- lm(growth ~ tradeshare + yearsschool + rev_coups + assasinations + rgdp60, data = Growth1)
+coeftest(modelE6.2b, vcovHC(modelE6.2b, type = "HC1"))
+```
+The coefficient on `rev_coups` is $-2.15$. This implies that one additional coup d'etat in those 35 years reduces annual GDP growth by 2.15% per year on average. If the coup happens in 1960 then the GDP in 1995 would be $2.15\% \cdot 35 = 75.25\%$ lower. This is a large effect. 
+
+
+#### Part c. 
+
+To compute the fitted values at the regressors' averages, use the `predict` command, whose `newdata` argument contains a dataframe with the averages, appropriately named. Note that the dataframe of averages must have column labels
+in order to be recognised by `predict`, hence the transposition of the vector `avg`.
+
+```{r}
+avg <- colMeans(Growth1[,variable.names(modelE6.2b)[-1]])
+avg <- as.data.frame(t(avg))
+predict(modelE6.2b, newdata = avg)[[1]]
+
+```
+The predicted growth rate at the mean values for all regressors is hence `r round(predict(modelE6.2b, newdata = avg), 2)`.
+
+#### Part d.
+
+```{r echo=FALSE}
+sd <- sd(data.matrix(Growth1[,"tradeshare"]))
+avgnew <- avg
+avgnew[1,1] <- avgnew[1,1] + sd
+predict(modelE6.2b, newdata = avgnew)[[1]]
+```
+Add one standard deviation to average tradeshare to find that the predicted growth rate is `r round(predict(modelE6.2b, newdata = avgnew), 2)`.
+
+
+#### Part e. 
+
+Recall that the variable `oil` takes on the value of 0 for all 64 countries in the sample. Including it would generate perfect multicollinearity, since `oil` is a linear combination of the constant regressor.
+
+
+
+
+
+
+# Chapter 7
+
+## Empirical Exercises
+
+
+### Exercise E7.1
+
+Load the data. Estimate the three regression models, using heteroscedasticity-robust standard errors. Display the results in a table.
+
+```{r}
+library(readxl)
+db <- read_xlsx("../StockWatson/birthweight_smoking.xlsx")
+
+modelE7.1i <- lm(birthweight ~ smoker, data = db)
+modelE7.1ii <- lm(birthweight ~ smoker + alcohol + nprevist, data = db)
+modelE7.1iii <- lm(birthweight ~ smoker + alcohol + nprevist + unmarried, data = db)
+
+library(sandwich)
+robseE7.1i <- sqrt(diag(vcovHC(modelE7.1i, type = "HC1")))
+robseE7.1ii <- sqrt(diag(vcovHC(modelE7.1ii, type = "HC1")))
+robseE7.1iii <- sqrt(diag(vcovHC(modelE7.1iii, type = "HC1")))
+
+library(stargazer)
+stargazer(modelE7.1i, modelE7.1ii, modelE7.1iii, 
+          se=list(robseE7.1i, robseE7.1ii, robseE7.1iii),
+          title="Regression Results", type="text",
+          df=FALSE)
+```
+
+#### Part a.
+
+Smoking is estimated to decrease birth weight by `r - modelE7.1i$coefficients[[2]]`, `r - modelE7.1ii$coefficients[[2]]` and `r - modelE7.1iii$coefficients[[2]]` grams, respectively.
+
+
+#### Part b.
+
+The corresponding 95% confidence intervals are
+$$
+\begin{align*}
+[`r modelE7.1i$coefficients[[2]] - qnorm(0.975)*robseE7.1i[[2]]` &, `r modelE7.1i$coefficients[[2]] + qnorm(0.975)*robseE7.1i[[2]]`] \\
+[`r modelE7.1ii$coefficients[[2]] - qnorm(0.975)*robseE7.1ii[[2]]` &, `r modelE7.1ii$coefficients[[2]] + qnorm(0.975)*robseE7.1ii[[2]]`] \\
+[`r modelE7.1iii$coefficients[[2]] - qnorm(0.975)*robseE7.1iii[[2]]` &, `r modelE7.1iii$coefficients[[2]] + qnorm(0.975)*robseE7.1iii[[2]]`] \\
+\end{align*}
+$$
+respectively.
+
+
+
+#### Part c.
+Yes it seems so. The coefficient of `smoker` falls by roughly 15% in magnitude when `alcohol` and `nprevist` are added to the regression.  This change is large relative to the standard error in (1).
+
+
+#### Part d.
+Yes it seems so. The coefficient of `smoker` falls by roughly 20% in magnitude when `unmarried` is added as an additional regressor.  Again, this change is large relative to the standard error in (2). 
+
+
+#### Part e.
+
+The 95% confidence interval is given by $[`r modelE7.1iii$coefficients[[5]] - qnorm(0.975)*robseE7.1iii[[5]]`, `r modelE7.1iii$coefficients[[5]] + qnorm(0.975)*robseE7.1iii[[5]]`]$. It does not include zero, so the coefficient is
+statistically significantly different from zero. The coefficient seems large since, on average, birthweight is `r - modelE7.1iii$coefficients[[5]]` grams lower for unmarried mothers. Such public policies are unlikely to lead to
+healthier babies, since `unmarried` is a control variable that captures the effects of several factors that differ between married and unmarried mothers such as age, education, income, diet, other health factors, and so forth.
+
+
+#### Part f.
+
+```{r}
+modelE7.1f <- lm(birthweight ~ smoker + alcohol + nprevist + unmarried + age + educ, data = db)
+robseE7.1f <- sqrt(diag(vcovHC(modelE7.1f, type = "HC1")))
+stargazer(modelE7.1f,
+          se=list(robseE7.1f),
+          title="Regression Results", type="text",
+          df=FALSE)
+```
+Including `age` and `educ` in the model results in a coefficient on `smoker` that is  very similar to its value in regression model (3) above.
+
+
+
+
+### Exercise E7.2
+
+Load the data.
+
+```{r}
+library(readxl)
+EnH <- read_excel("../StockWatson/Earnings_and_Height.xlsx")
+```
+
+
+#### Part a.
+
+According to Key Concept 6.1, omitted variable bias arises if:
+
+ 1. the regressor $X$ is correlated with the omitted variable, and
+ 2. the omitted variable is a determinant of the dependent variable $Y$.
+ 
+The mechanism described in the question explains why the regressor `height` and the omitted variable `cognitive ability` are correlated and why `cognitive ability` is a determinant of the depedend variable `earnings`.  This
+mechanism suggests that height and cognitive ability are positively correlated and that cognitive ability has a positive effect on earnings. Thus, the regressor will be positively correlated with the error, leading to a positive
+bias in the estimated coefficient.
+
+
+#### Part b.
+
+Create the suggested variables:
+```{r}
+EnH$LT_HS <- with(EnH, ifelse(educ < 12, 1, 0))
+EnH$HS <- with(EnH, ifelse(educ == 12, 1, 0))
+EnH$Some_Col <- with(EnH, ifelse( educ > 12 & educ < 16, 1, 0))
+EnH$College <- with(EnH, ifelse(educ >= 16, 1, 0))
+```
+
+and create subsets of the data for men and women:
+```{r}
+EnH_female <- subset(EnH, EnH$sex == "0")
+EnH_male <- subset(EnH, EnH$sex == "1")
+```
+
+Estimate now the regression models for women only, construct heteroscedasticty-robust standard errors, and display the results.
+```{r}
+library(sandwich)
+library(stargazer)
+modelE7.2b1 <- lm(earnings ~ height, data= EnH_female)
+modelE7.2b2 <- lm(earnings ~ height + LT_HS + HS + Some_Col + College, data= EnH_female)
+robseE7.2b1 <- sqrt(diag(vcovHC(modelE7.2b1, type = "HC1")))
+robseE7.2b2 <- sqrt(diag(vcovHC(modelE7.2b2, type = "HC1")))
+stargazer(modelE7.2b1, modelE7.2b2,
+          se=list(robseE7.2b1, robseE7.2b2),
+          title="Regression Results",
+          type="text",
+          df=FALSE,
+          digits=3)
+```
+
+The estimated coefficient on `height` falls by approximately 75%, from `r modelE7.2b1$coefficients[[2]]` to `r modelE7.2b2$coefficients[[2]]` when the education variables are added as control variables in the regression. This is
+consistent with positive omitted bias in the first model.
+
+Yet `College` is dropped from the model automatically since it is perfectly collinear with the other education dummies and the constant term.
+
+For an F-test on the relevance of the education variables, estimate the model without `College` again to actively avoid the dummy variable trap. The `car` package has the convenient `lht` command for testing joint null hypotheses.
+
+```{r}
+modelE7.2b2 <- lm(earnings ~ height + LT_HS + HS + Some_Col, data= EnH_female)
+library(car)
+Ftest <- lht(modelE7.2b2, c("LT_HS = 0", "HS = 0", "Some_Col = 0"), white.adjust = "hc1")
+Ftest
+```
+
+The F-statistic is `r Ftest$F[[2]]`, which is larger than the 1% critical value of `r qf(0.99, 3, Inf)`, taken from the $F (3,\infty)$-distribution. Therefore, the null hypothesis that the coefficients on the education variables are
+jointly equal to zero is rejected at the 1% significance level.
+
+The coefficients measure the effect of education on earnings relative to the omitted category, which is `College`. Thus, the estimated coefficient on regressor `LS_HS` implies that workers with less than a high school education on
+average earn \$`r -modelE7.2b2$coefficients[[3]]` less per year than a college graduate. A worker with a high school education earns on average \$`r -modelE7.2b2$coefficients[[4]]` less per year than a college graduate. And a
+worker with a some college educaton on average earns \$`r -modelE7.2b2$coefficients[[5]]` less per year than a college graduate.
+
+
+#### Part c.
+
+Repeating the analysis for men, yields
+```{r}
+modelE7.2c1 <- lm(earnings ~ height, data=EnH_male)
+modelE7.2c2 <- lm(earnings ~ height + LT_HS + HS + Some_Col, data=EnH_male)
+robseE7.2c1 <- sqrt(diag(vcovHC(modelE7.2c1, type = "HC1")))
+robseE7.2c2 <- sqrt(diag(vcovHC(modelE7.2c2, type = "HC1")))
+stargazer(modelE7.2c1, modelE7.2c2,
+          se=list(robseE7.2c1, robseE7.2c2),
+          title="Regression Results",
+          type="text",
+          df=FALSE,
+          digits=3)
+lht(modelE7.2c2, c("LT_HS = 0", "HS = 0", "Some_Col = 0"), white.adjust = "hc1")
+```
+The results are qualitatively similar to those for women.
+
+
+
+
+# Chapter 8 
+
+## Empirical Exercises 
+
+### Exercise E8.1
+
+Load the data set.
+
+```{r echo=-3}
+library(readxl)
+data <- read_excel("../StockWatson/lead_mortality.xlsx")
+## View(data)
+```
+
+
+#### Part a.
+
+Estimate the simple regression of `infrate` on `lead`, construting heteroscedasticity-robust standard errors.
+
+```{r E8.1}
+library(lmtest)
+library(sandwich)
+modelE8.1a <- lm(infrate ~ lead, data)
+coeftest(modelE8.1a, vcovHC(modelE8.1a, type = "HC1"))
+```
+
+
+#### Part b.
+
+Regress `infrate` on `lead`, `ph` and the interaction term.
+
+```{r}
+modelE8.1b <- lm(infrate ~ lead + ph + lead*ph, data)
+coeftest(modelE8.1b, vcovHC(modelE8.1b, type = "HC1"))
+```
+
+The second and fourth coefficient measure the effect of `lead` on `infrate`. The expected infant mortality rate of a city with lead pipes differs from that of a city without lead pipes but with the same pH by
+$$
+`r modelE8.1b$coefficients[[2]]` `r modelE8.1b$coefficients[[4]]` \times \text{ph}.
+$$
+Similarly, the effect of `ph` on `infrate` is measured by the third and fourth coefficient: The difference in expected infant mortality rates of two cities whose pH differs by 1 but whose pipes are of the same material is
+$$
+`r modelE8.1b$coefficients[[3]]` `r modelE8.1b$coefficients[[4]]` \times \text{lead}.
+$$
+
+For the plot, construct subsets of the data, one for observations with `lead` being zero and another with `lead` being one, and plot a scatter of `ph` against `infrate`, using circles for observations with `lead=0` and dots for
+observations with `lead=1`. Define a general sample regression function `yhat` and extract the estimated coefficients for the data with `lead=0` and with `lead=1`. Finally, add to the scatterplot the sample regression when
+`lead=0` and that when `lead=1`.
+
+```{r}
+subset.lead0 <- subset(data, lead==0)
+subset.lead1 <- subset(data, lead==1)
+plot(subset.lead0$ph, subset.lead0$infrate, xlab="pH", ylab="infrate", pch=1)
+points(subset.lead1$ph, subset.lead1$infrate, pch=20)
+
+yhat <- function(x, b) as.numeric(b[1] + b[2]*x)
+betas    <- modelE8.1b$coefficients
+betas.lead0  <- betas[c(1,3)]
+betas.lead1  <- c(betas[1]+betas[2], betas[3]+betas[4])
+
+lines(data$ph, yhat(data$ph, betas.lead0), col="darkgrey")
+lines(data$ph, yhat(data$ph, betas.lead1))
+legend("topright", inset=0.05, legend=c("(x,y) for lead=0", "(x,y) for lead=1", "fit for lead=0", "fit for lead=1"),
+       lty = c(0, 0, 1, 1), pch = c(1, 20, NA, NA), col=c("black", "black", "grey", "black"))
+
+```
+
+To test the null hypothesis of whether `lead` contributes significantly to explaining infant mortality, construct an F test, restricting the coefficient of `lead` and of the interaction term to zero.
+
+```{r}
+library(car)
+FstatE8.1b <- linearHypothesis(modelE8.1b,
+                               c("lead","lead:ph"),
+                               c(0, 0),
+                               vcov. = vcovHC(modelE8.1b, type = "HC1"))
+```
+
+The resulting F-statistic is equal to `r FstatE8.1b$F[[2]]`, which larger than the 5% critical value `r qf(0.95, 2, Inf)` but not as large as the 1% critical value `r qf(0.99, 2, Inf)`, both of which are taken from the $F
+(2,\infty)$-distribution.
+
+```{r echo=FALSE}
+resultsE8.1b <- coeftest(modelE8.1b, vcovHC(modelE8.1b, type = "HC1"))
+```
+Whether or not the effect of `lead` depends on `pH` can be investigated by a t-test on the coefficient of the interaction term: the p-value is `r resultsE8.1b[[16]]` so that the null is rejected marginally at the 5% level.
+
+The estimated effects of `lead` on `infrate` at the mean level of `pH` and at `pH` being one standard deviation below and above its mean can be computed manually using the prediction function defined above:
+
+```{r}
+mean.pH <- mean(data$ph)
+mean.pH
+yhat(mean.pH, betas.lead1) - yhat(mean.pH, betas.lead0) 
+
+sd.pH <- sd(data$ph)
+sd.pH
+yhat(mean.pH-sd.pH, betas.lead1) - yhat(mean.pH-sd.pH, betas.lead0)
+yhat(mean.pH+sd.pH, betas.lead1) - yhat(mean.pH+sd.pH, betas.lead0)
+```
+
+The population regression model is
+$$
+\text{infrate}_i = \beta_0 + \beta_1 \text{lead}_i + \beta_2 \text{ph}_i + \beta_3 \text{lead}_i \times \text{ph}_i + u_i.
+$$
+As argued for the sample regression function above, the effect of `lead` on `infrate` is $\beta_1 + \beta_3 \text{ph}_i$. So, what is sought is a confidence interval for $\beta_1 + 6.5 \beta_3$. This can be obtained by
+estimating $\beta_1 + 6.5 \beta_3$ directly and computing heteroscedasticity-robust standard errors. To that end, re-write the model as
+$$
+\begin{align*}
+\text{infrate}_i &= \beta_0 + \beta_1 \text{lead}_i + 6.5 \beta_3 \text{lead}_i + \beta_2 \text{ph}_i + \beta_3 \text{lead}_i \times \text{ph}_i - 6.5 \beta_3 \text{lead}_i + u_i \\
+                 &= \beta_0 + (\beta_1 + 6.5 \beta_3) \text{lead}_i + \beta_2 \text{ph}_i + \beta_3 (\text{lead}_i \times \text{ph}_i - 6.5 \text{lead}_i) + u_i \\
+                 &= \beta_0 + (\beta_1 + 6.5 \beta_3) \text{lead}_i + \beta_2 \text{ph}_i + \beta_3 (\text{lead}_i \times (\text{ph}_i - 6.5)) + u_i .
+\end{align*}
+$$
+The effect of interest is given by the coefficient of `lead`.
+
+
+```{r}
+data$ph.65 <- data$ph - 6.5 
+modelE8.1bii <- lm(infrate ~ lead + ph + lead*ph.65, data)
+coeftest(modelE8.1bii, vcovHC(modelE8.1bii, type = "HC1"))
+```
+
+
+#### Part c.
+
+There are several demographic variables in the dataset. One could add these to the model and see whether the conclusions from Part b. change in an important way.
+
+
+
+
+### Exercise E8.2 
+
+Load the CPS12 data:
+```{r}
+library(readxl)
+CPS12 <- read_excel("../StockWatson/cps12.xlsx")
+```
+and create the variables as needed in the analysis:
+```{r}
+ahe <- CPS12$ahe
+age <- CPS12$age
+age2 <- CPS12$age^2
+female <- CPS12$female
+bachelor <- CPS12$bachelor
+lnahe <- log(CPS12$ahe)
+lnage <- log(CPS12$age)
+fe_ba <- with(CPS12, female*bachelor)
+fe_age <- with(CPS12, female*age)
+fe_age2 <- with(CPS12, female*age2)
+ba_age <- with(CPS12, bachelor*age)
+ba_age2 <- with(CPS12, bachelor*age2)
+```
+Note that the `with` command is a convenient way to access the variables in the `CPS12` database, much more easily read than the `CPS12$` prefix.
+
+The models to be estimated in this exercises are the following:
+```{r}
+modelE8.2a <- lm(ahe ~ age + female + bachelor)
+modelE8.2b <- lm(lnahe ~ age + female + bachelor)
+modelE8.2c <- lm(lnahe ~ lnage + female + bachelor)
+modelE8.2d <- lm(lnahe ~ age + age2 + female + bachelor)
+modelE8.2i <- lm(lnahe ~ age +age2 +female + bachelor + fe_ba)
+modelE8.2j <- lm(lnahe ~ age + age2 + female + bachelor + fe_age + fe_age2)
+modelE8.2k <- lm(lnahe ~ age + age2 + female + bachelor + ba_age + ba_age2)
+```
+The corresponding heteroscedasticity-robust standard errors are:
+```{r}
+library(sandwich)
+robseE8.2a <- sqrt(diag(vcovHC(modelE8.2a, type = "HC1")))
+robseE8.2b <- sqrt(diag(vcovHC(modelE8.2b, type = "HC1")))
+robseE8.2c <- sqrt(diag(vcovHC(modelE8.2c, type = "HC1")))
+robseE8.2d <- sqrt(diag(vcovHC(modelE8.2d, type = "HC1")))
+robseE8.2i <- sqrt(diag(vcovHC(modelE8.2i, type = "HC1")))
+robseE8.2j <- sqrt(diag(vcovHC(modelE8.2j, type = "HC1")))
+robseE8.2k <- sqrt(diag(vcovHC(modelE8.2k, type = "HC1")))
+```
+The results can be neatly displayed using the `stargazer` package.
+```{r}
+library(stargazer)
+stargazer(modelE8.2a, modelE8.2b, modelE8.2c, modelE8.2d, modelE8.2i, modelE8.2j, modelE8.2k,
+          se = list(robseE8.2a, robseE8.2b, robseE8.2c, robseE8.2d, robseE8.2i, robseE8.2j, robseE8.2k),
+          title="Regression Results", type="text",
+          df=FALSE, digits=3)
+```
+
+
+#### Part a.
+The regression results for this question are shown in column (1) of the table.  If `age` increases from 25 to 26, `ahe` are predicted to increase by $0.510 per hour. If `age` increases from 33 to 34, `ahe` are predicted to increase by $0.510 per hour. These values are the same because the regression is a linear function relating `ahe` and `age`.
+
+
+#### Part b.
+The regression results for this question are shown in column (2) of the table.  If `age` increases from 25 to 26, `lnahe` is predicted to increase by 0.026, so `ahe` are predicted to increase by 2.6%. If `age` increases from 34 to 35, `lnahe` is predicted to increase by 0.026, so earnings are predicted to increase by 2.6%. These values, in percentage terms, are the same because the regression is a linear function relating `lnahe` and `age`.
+
+
+#### Part c.
+The regression results for this question are shown in column (3) of the table. If `age` increases from 25 to 26, then `lnage` has increased by $\ln(26) - \ln(25) = 0.0392$, or 3.92%. The predicted increase in `lnahe` is $0.75 \times 0.0392 = 0.029$. This means that `ahe` are predicted to increase by 2.9%. If `age` increases from 34 to 35, then `lnage` has increased by $ln(35) - ln(34) = 0.0290$, or 2.90%. The predicted increase in `lnahe` is $0.75 \times 0.0290 = 0.021$. This means that `ahe` are predicted to increase by 2.1%.
+
+
+#### Part d.
+The regression results for this question are shown in column (4) of the table. When `age` increases from 25 to 26, the predicted change in `lnahe` is $(0.104 \times 26 - 0.001 \times 26^2) - (0.104 \times 25 - 0.001 \times 25^2) = 0.053$. This means that `ahe` are predicted to increase by 5.3%. When `age` increases from 34 to 35, the predicted change in `lnahe` is $(0.104 \times 35 - 0.001 \times 35^2) - (0.104 \times 34 - 0.001 \times 34^2) = 0.035$. This means that earnings `ahe` are predicted to increase by 3.5%.
+
+
+#### Part e.
+The regressions differ in their choice of one of the regressors. They can be compared on the basis of the $\bar R^2$. The regression in (3) has a (marginally) higher $\bar R^2$ so it is preferred.
+
+
+#### Part f.
+The regression in (4) adds the variable `age2` to regression (2). The coefficient on `age2` is only statistically significant at the 10% level but not the 5% level, and the estimated coefficient is very close to zero. This suggests there is no need to add `age2` to the regression, and regression (2) is preferred to (4),
+
+
+#### Part g.
+The regressions differ in their choice of the regressors, namely `lnage` in (3) and `age` and `age2` in (4). They can be compared on the basis of the $\bar R^2$. The regression in (4) has a (marginally) higher $\bar R^2$ so it is preferred.
+
+
+#### Part h.
+
+In order to plot the regression functions, determine the range of the independent variable `age` for which to compute the dependent variable `lnahe` by
+
+* finding the minimum and the maximum value of `age` and 
+* simulating 1000 values between these bounds.
+
+```{r}
+age_min = min(CPS12$age, na.rm = FALSE)
+age_max = max(CPS12$age, na.rm = FALSE)
+age_sim <- seq(age_min, age_max, length=1000)
+lnage_sim <- log(age_sim)
+age2_sim <- (age_sim)^2
+```
+
+Subsequently, plug the simulated regressors into the sample regression functions to generate the fitted values:
+```{r}
+lnahe_sim1 <- predict(modelE8.2b, data.frame(age=age_sim, female=0, bachelor=0))
+lnahe_sim2 <- predict(modelE8.2c, data.frame(lnage=lnage_sim, female=0, bachelor=0))
+lnahe_sim3 <- predict(modelE8.2d, data.frame(age=age_sim, age2=age2_sim, female=0, bachelor=0))
+```
+and plot the scatters of `lnahe` vs `age` and add simulated fitted values of regressions
+```{r echo=FALSE, eval=FALSE}
+# CPS12_plot <- subset(CPS12, female == 0 & bachelor == 0, select = c(lnahe,age,female, bachelor))
+# plot(CPS12_plot$age, CPS12_plot$lnahe, ylab = "lnahe", xlab = "age",ylim = c(2.55,2.85))# the "ylim" is to set the value limitation of y shown in the plot
+# lines(age_sim, lnahe_sim1, col="red")
+# lines(age_sim, lnahe_sim2, col="blue")
+# lines(age_sim, lnahe_sim3, col="green")
+```
+```{r}
+plot(age[which(female==0, bachelor==0)], lnahe[which(female==0, bachelor==0)], ylab = "lnahe", xlab = "age", ylim = c(2.55, 2.85))
+lines(age_sim, lnahe_sim1, col="red")
+lines(age_sim, lnahe_sim2, col="blue")
+lines(age_sim, lnahe_sim3, col="green")
+```
+
+- The regression functions are very similar. The quadratic regression shows somewhat more curvature than the log-log regression, but the difference is small.
+- The regression functions for a female with a high school diploma will look just like these, but they will be shifted by the amount of the coefficient on the binary regressor `female`.
+- The regression functions for workers with a bachelor's degree will also look just like these, but they would be shifted by the amount of the coefficient on the binary variable `bachelor`.
+
+
+#### Part i.
+The sample regression (5) is:
+$$
+\widehat{\ln(AHE)} = 0.804 + 0.104 \ \text{Age} - 0.001 \ \text{Age}^2 - 0.242 \ \text{Female} + 0.400 \ \text{Bachelor} + 0.090 \ \text{Female} \times \text{Bachelor}
+$$
+The coefficient on the interaction term shows the "extra effect" of `bachelor` on `lnahe` for women relative to the effect for men.
+
+$$ \widehat{\ln(AHE)}_{\text{Alexis}} = 0.804 + 0.104 \times 30 - 0.001 \times 30^2- 0.242 + 0.400 + 0.090 = 3.272$$
+
+$$ \widehat{\ln(AHE)}_{\text{Jane}} = 0.804 + 0.104 \times 30 - 0.001 \times 30^2- 0.242 = 2.782$$
+
+$$ \widehat{\ln(AHE)}_{\text{Bob}} = 0.804 + 0.104 \times 30 - 0.001 \times 30^2 + 0.400 = 3.424$$
+
+$$ \widehat{\ln(AHE)}_{\text{Jim}} = 0.804 + 0.104 \times 30 - 0.001 \times 30^2 = 3.024$$
+
+Therefore, 
+$$\widehat{\ln(AHE)}_{\text{Alexis}} - \widehat{\ln(AHE)}_{\text{Jane}} = 0.49$$
+and
+$$\widehat{\ln(AHE)}_{\text{Bob}} - \widehat{\ln(AHE)}_{\text{Jim}} = 0.40.$$
+
+
+
+#### Part j.
+This regression is shown in (6), which includes two additional regressors: the interactions of `female` and the age variables, `age` and `age2`.
+```{r}
+library(car)
+linearHypothesis(modelE8.2j, c("fe_age = 0", "fe_age2 = 0"), vcov. = vcovHC(modelE8.2j, type = "HC1"), test = "F")
+```
+
+The F-statistic testing the restriction that the coefficients on these interaction terms is equal to zero is 4.34 with a p-value of 0.013. This implies that there is statistically significant evidence (at the 5% but not 1% level) that there is a different effect of `age` on `lnahe` for men and women.
+
+
+#### Part k.
+This regression is shown in column (7), which includes two additional regressors that are interacted with `bachelor`, viz. the age variables, `age` and `age2`.
+```{r}
+linearHypothesis(modelE8.2k, c("ba_age = 0", "ba_age2 = 0"), vcov. = vcovHC(modelE8.2k, type = "HC1"), test = "F")
+```
+The F-statistic testing the restriction that the coefficients on these interaction terms is zero is 1.28, with a pvalue of 0.28. This implies that there is no statistically significant evidence (at the 10% level) that there is a different effect of `age` on `lnahe` for high school and college graduates.
+
+
+#### Part l.
+
+The estimated regressions suggest that earnings increase as workers age from 25–35, the range of age studied in this sample.
+
+Gender and education are significant predictors of earnings; there are statistically significant interaction effects between age and gender (see Part j) and between gender and and education (see Part i). However, the interaction effect between age and education is not significant (see Part k).
+
+We can draw a figure to show how gender and education affect the effect of age on earnings. This is done by plugging the simulated regressors `age_sim` and `age2_sim` into the estimated regressions above, and by plotting the relationships.
+```{r}
+lnahe_sim4 <- predict(modelE8.2d, data.frame(age=age_sim, female=1, bachelor=0, age2=age2_sim, fe_age=age_sim, fe_age2=age2_sim))
+lnahe_sim5 <- predict(modelE8.2d, data.frame(age=age_sim, female=0, bachelor=0, age2=age2_sim, fe_age=0, fe_age2=0))
+lnahe_sim6 <- predict(modelE8.2b, data.frame(age=age_sim, female=1, bachelor=1, age2=age2_sim, fe_age=age_sim, fe_age2=age2_sim))
+lnahe_sim7 <- predict(modelE8.2b, data.frame(age=age_sim, female=0, bachelor=1, age2=age2_sim,fe_age=0, fe_age2=0))
+
+plot(age_sim, lnahe_sim4, ylab="lnahe", xlab="age", type ="l" , ylim=c(2.3,3.3))
+lines(age_sim, lnahe_sim5, col="red")
+lines(age_sim, lnahe_sim6, col="blue")
+lines(age_sim, lnahe_sim7, col="green")
+legend("topleft", legend=c("female w/o degree", "male w/o degree", "female w/ degree", "make w/ degree"), col=c("black", "red", "blue", "green"), lty=1)
+```
+
+
+# Chapter 10
+
+## Empirical Exercises 
+
+
+### Exercise E10.1
+
+Load the guns data set into the `data` variable.
+```{r}
+library(readxl)
+data <- read_excel("../StockWatson/Guns.xlsx")
+## View(data)
+```
+
+Identify the cross-sectional and time-series dimension of the panel for late use. Note that the  function `unique` removes duplicates from the variable `data$stateid`
+```{r}
+n <- length(unique(data$stateid))
+T <- max(data$year)-min(data$year)+1
+```
+
+Time dummies for the individual years in the sample will be needed at a later stage. The `dummies` package provides an easy way for creating indicator variables. Note, however, that its argument must be a data frame, not a tibble: check this by `class(data)`.
+```{r}
+library(dummies) 
+data[,paste0("year", 77:99)] <- dummy("year", as.data.frame(data))
+```
+
+The dependent variables below are going to be log transformations of `vio` and `rob`, respectively.
+```{r}
+data$log.vio <- log(data$vio)
+data$log.rob <- log(data$rob)
+## View(data)
+```
+
+#### Part a.
+
+Estimate, first, two simple models by OLS, not allowing for fixed effects. This corrsponds to the `pooling` option in the `plm` command. The `arellano` argument of the `vcovHC` function then computes clustered standard errors
+which, as can be gleaned from the `HC1` argument, are also heteroscedasticticy-robust.
+
+First, regress crimes on the law dummy alone:
+```{r}
+library(plm)
+model.1 <- plm(log.vio ~ shall,
+               index = c( "stateid","year"),
+               model = "pooling",
+               data)
+library(lmtest)
+coeftest(model.1, vcovHC(model.1, method = "arellano", type = "HC1"))
+```
+Since the model is a log-linear regression, a coefficient of `r model.1$coefficients[[2]]` means that the law reduces violent crime by `r -model.1$coefficients[[2]]*100`%.
+
+Now regress crime on the law dummy as well as the controls:
+```{r}
+model.2 <- plm(log.vio ~ shall + incarc_rate +  density + avginc + pop +pb1064 + pw1064 + pm1029,
+               index = c("stateid","year"),
+               model = "pooling",
+               data)
+coeftest(model.2, vcovHC(model.2, method = "arellano", type = "HC1"))
+```
+This model predicts the law to reduce violent crime by `r -model.2$coefficients[[2]]*100`%. The two coefficients are of a similar order of magnitude, and both a statistically significant at the  5% level. The estimated effects are large in a real world sense.
+
+Omitted variable bias could be caused by, for instance, attitudes towards guns and crime, or by the quality of police and other crime-prevention programmes.
+
+
+#### Part b.
+
+To account for unobserved factors that are constant over time, add the arguments `model = "within"` for fixed effects and `effect = "individual"` for entity FEs to the model specification.
+```{r}
+model.3 <- plm(log.vio ~ shall + incarc_rate +  density + avginc + pop +pb1064 + pw1064 + pm1029,
+               index = c("stateid","year"),
+               effect = "individual",
+               model = "within",
+               data)
+coeftest(model.3, vcovHC(model.3, method = "arellano", type = "HC1"))
+```
+The effect of the law is now estimated to be `r -model.3$coefficients[[1]]*100`% and no longer statistically significant. The previous results appear to have suffered from omitted variable bias.
+
+
+#### Part c.
+
+To account for unobserved factors that are constant over time and across entities, respectively, specify `effects = "twoways"` for entity and time FEs.
+```{r}
+model.4 <- plm(log.vio ~ shall + incarc_rate +  density + avginc + pop +pb1064 + pw1064 + pm1029,
+               index = c("stateid","year"),
+               effect = "twoways",
+               model = "within",
+               data)
+coeftest(model.4, vcovHC(model.4, method = "arellano", type = "HC1"))
+```
+The estimated effect of the law falls further to an insignificant `r -model.4$coefficients[[1]]*100`%. 
+
+In order to see whether the time fixed effects are statistically significant, the model needs to be constructed again manually. To that end, create the model specification as `formula`:
+```{r}
+year.dummies <- paste(paste("year", 78:99, sep =""), collapse= "+", sep = "")
+formula <- as.formula(paste("log.vio ~ shall + incarc_rate +  density + avginc + pop +pb1064 + pw1064 + pm1029 + ", year.dummies))
+```
+and estimate the model
+```{r}
+model.5 <- plm(formula,
+               index = c( "stateid","year"),
+               effect = "individual",
+               model = "within",
+               data = data)
+coeftest(model.5, vcovHC(model.5, method = "arellano", type = "HC1"))
+```
+The significance of the time dummies can now be tested as usual:
+```{r}
+library(car)
+linearHypothesis(model.5,
+                 paste("0 = year", 78:99, sep=""),
+                 test="F",
+                 vcov. = vcovHC(model.5, method = "arellano", type = "HC1"))
+```
+Clearly, the time fixed effects are highly statistically significant.
+
+
+#### Part d.
+
+The results remain qualitatively similar if `log.rob` is used as dependent variable instead of `log.vio`.
+
+
+#### Part e.
+
+Could it be that legislators are influenced by the amount of violent crime in the past?
+
+
+#### Part f.
+
+Regression `model.4` is the most credible, yet the effect in that model is not statistically different from 0.
+
+
+
+
+
+### Exercise E10-2
+
+Load the data set.
+```{r}
+library(readxl)
+data <- read_excel("../StockWatson/income_democracy.xlsx")
+```
+
+#### Part a.
+
+The dataset is clearly not balanced as it contains many missings (i.e. `NA`'s):
+```{r}
+head(data)
+```
+Note that a tibble is an extended data frame that also stores information such as whether a column contains strings (`chr`) or real numbers (`dbl`).
+
+#### Part b.
+
+
+##### _**(i)**_
+
+Compute the descriptive statistics as usual, but set the `na.rm=TRUE` option to remove the missing values.
+```{r}
+min(data$dem_ind, na.rm=TRUE)
+max(data$dem_ind, na.rm=TRUE)
+mean(data$dem_ind, na.rm=TRUE)
+sd(data$dem_ind, na.rm=TRUE)
+quantile(data$dem_ind, c(0.1,0.25,.5,.75,.9), na.rm=TRUE)
+```
+
+##### _**(ii)**_
+
+Restrict the data set to `data$country == "United States"` and, if appropriate, to `data$year == 2000` to find the value of the democracy index averaged over the years 1965 to 2000 and, then, in 2000, respectively.
+
+```{r}
+subset(data$dem_ind, data$country == "United States" & data$year == 2000)
+mean(subset(data$dem_ind, data$country == "United States"))
+```
+
+##### _**(iii)**_
+
+Similarly, for Libya one gets:
+
+```{r}
+subset(data$dem_ind, data$country == "Libya" & data$year == 2000) 
+mean(subset(data$dem_ind, data$country == "Libya"))
+```
+
+##### _**(iv)**_
+
+Countries with an index value larger than 0.95 are France and Canada, Poland's and Hungry's lie between 0.3 and 0.7, while Afghanistan and China have a value smaller than 0.1.
+
+```{r}
+mean(subset(data$dem_ind, data$country == "France"))
+mean(subset(data$dem_ind, data$country == "Canada"))
+mean(subset(data$dem_ind, data$country == "Poland"))
+mean(subset(data$dem_ind, data$country == "Hungary"))
+mean(subset(data$dem_ind, data$country == "Afghanistan"))
+mean(subset(data$dem_ind, data$country == "China"))
+```
+
+
+
+#### Part c.
+
+##### _**(i)**_
+
+Specify first the panel model
+$$
+\begin{align*}
+\textit{dem_ind}_{it} = \beta_0 + \beta_1 \textit{log_gdppc}_{it} + u_{it}.
+\end{align*}
+$$
+Note that this model does not include fixed effects. Estimating it by OLS requires the `pooling` option. Heteroscedasticity-robust clustered standard errors are computed by the `vcovHC` function with  `arellano` and `HC1` options.
+
+```{r}
+library(plm)
+model1 <- plm(dem_ind ~ log_gdppc,
+              index = c("country","year"),
+              model = "pooling",
+              data = data)
+library(lmtest)
+library(sandwich)
+coeftest(model1, vcov. = vcovHC(model1,
+                                method = "arellano",
+                                type = "HC1"))
+```
+The estimated coefficient is `r model1$coefficients[[2]]`. Since this is a lin-log model this  means that a 1% increase in `gdppc` leads to an increase in the democracy index of $\hat \beta_1 / 100 = `r 0.01*model1$coefficients[[2]]`$. The estimate is highly significant.
+
+##### _**(ii)**_
+
+If `gdppc` increases by 20% then `dem_ind` increases by $20 \hat \beta_1 / 100 = `r 0.2*model1$coefficients[[2]]`$. The 95% confidence interval for `dem_ind` following a 20% increase in `gdppc` is
+$$
+\begin{align*}
+[`r 0.2*(model1$coefficients[[2]] - qnorm(0.975)*sqrt(vcovHC(model1, method = "arellano", type = "HC1")[[4]]))`, `r 0.2*(model1$coefficients[[2]] + qnorm(0.975)*sqrt(vcovHC(model1, method = "arellano", type = "HC1")[[4]]))`]
+\end{align*}
+$$
+
+
+##### _**(iii)**_
+
+Clustered SEs are needed if the error term is correlated over time for a given country but not across countries. Clearly, point estimates remain unchanged, irrespective of whether clustered or non-clustered SEs are used. The
+confidence interval will change, however.
+
+For heteroscedasticity-robust yet unclustered SEs, use the `vcovHC` function with the `white1` option. They are smaller than the clustered SEs above because they ignore the correlation of the error term over time for a given country.
+
+```{r}
+coeftest(model1, vcovHC(model1,
+                        method = "white1",
+                        type = "HC1"))
+```
+
+
+#### Part d.
+
+##### _**(i)**_
+
+Candidate factors that vary across countries but little, if at all, over time include cultural attitudes towards democracy, geographic factors, and history.
+
+
+##### _**(ii)**_
+
+The model above augmented by country fixed effects is
+$$
+\begin{align*}
+\textit{dem_ind}_{it} = \alpha_i + \beta_1 \textit{log_gdppc}_{it} + u_{it}.
+\end{align*}
+$$
+Fixed effects are specified via `model = "within"` and entity fixed effects in particular by `effect = "individual"`:
+
+```{r}
+model2 <- plm(dem_ind ~ log_gdppc,
+               index = c("country","year"),
+               effect = "individual",
+               model = "within", 
+               data = data)
+coeftest(model2, vcovHC(model2,
+                        method = "arellano",
+                        type = "HC1"))
+```
+As a result, a 20% increase in `gdppc` is, on average, associated with an increase in `dem_ind` by `r 0.2*model2$coefficients[[1]]`. The effect is still statisticaly significant.
+
+
+##### _**(iii)**_
+
+Construct a dataset that does not include Azerbaijan and re-estimate the model above.
+
+```{r}
+data0 <- subset(data, data$country != "Azerbaijan")
+plm(dem_ind ~ log_gdppc,
+    index = c("country","year"),
+    effect = "individual",
+    model = "within",
+    data = data0)
+```
+
+The estimated coefficient of `log_gdppc` is the same as before. The reason for this is that there is only one observation for Azerbaijan, in 2000, yet FE regression requires at least 2 time series observations. Consequently, the
+one observation for Azerbaijan is absorbed by the country's fixed effect and the estimated slope coefficient $\hat \beta_1$ does not change.
+
+                                                                                                              
+
+##### _**(iv)**_
+
+If demand for democracy, see for instance the Arab Spring in 2012, is related to global economic conditions, then there is OV bias.
+
+
+
+##### _**(v)**_
+
+Consider the model with both country and time fixed effects.
+$$
+\begin{align*}
+\textit{dem_ind}_{it} = \alpha_i + \lambda_t + \beta_1 \textit{log_gdppc}_{it} + u_{it}.
+\end{align*}
+$$
+
+Estimation yields
+```{r}
+model3<- plm(dem_ind ~ log_gdppc,
+              index = c("country","year"),
+              effect = "twoways", 
+              model = "within",
+             data)
+coeftest(model3, vcovHC(model3,
+                        method = "arellano",
+                        type = "HC1"))
+```
+Relative to the previous model, the effect of a 20% increase in `gdppc` now falls to an increase in `dem_ind` by, on average, `r 0.2*model3$coefficients[[1]]`. The effect is no longer statistically significant.
+
+
+##### _**(vi)**_
+
+Augment the model by the country's population (`log_pop`), by the fraction of the population in various age brackets (`age_1`, ..., `age_5`) and by the average number of years if education for adults (`educ`).
+
+```{r}
+model4<- plm(dem_ind ~ log_gdppc + log_pop + educ  + age_2  + age_3  + age_4  + age_5,
+             index = c("country","year"),
+             effect = "twoways",
+             model = "within",
+             data = data)
+coeftest(model4, vcovHC(model4,
+                        method = "arellano",
+                        type = "HC1"))
+
+```
+The coefficient of `log_gdppc` falls further and remains insignificant.
+
+However, the null hypothesis that all all demographic variables jointly have no effect is not rejected.
+```{r}
+library(car)
+linearHypothesis(model4,
+                 c("age_2 = 0",
+                   "age_3 = 0",
+                   "age_4 = 0",
+                   "age_5 = 0",
+                   "educ = 0",
+                   "log_pop = 0"),
+                 test="F",
+                 vcov. = vcovHC(model4,
+                                method = "arellano",
+                                type = "HC1"))
+```
+
+The null hypothesis that age alone has no effect is rejected at the 10% level.
+
+```{r}
+linearHypothesis(model4,
+                 c("age_2 = 0",
+                   "age_3 = 0",
+                   "age_4 = 0",
+                   "age_5 = 0"),
+                 test="F",
+                 vcov. = vcovHC(model4,
+                                method = "arellano",
+                                type = "HC1"))
+```
+
+To examine whether the time fixed effects contribute to explaining the data, construct the model manually and re-estimate it. Create and append the dummies to the database `data`. 
+```{r}
+library(dummies)
+years <- c(1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000)
+data[,paste("year", years, sep ="")] <- dummy("year", as.data.frame(data))
+```
+
+Specify the model, dropping one year dummy to avoid exact multicollinearity: 1960.
+```{r}
+model5 <- plm(dem_ind ~ log_gdppc + log_pop + educ + age_2 + age_3 + age_4 + age_5 + year1965 + year1970 + year1975 + year1980 + year1985 + year1990 + year1995 + year2000,
+              index = c( "country","year"),
+              model = "within",
+              data = data)
+coeftest(model5, vcovHC(model5, 
+                        method = "arellano",
+                        type = "HC1"))
+
+```
+<!-- SEs would correspond to model4 if HC0 were used here and there -->
+
+Note that the year dummy for 2000 has also been automatically dropped. The null hypothesis that the time fixed effects have no effects is then rejected at the 1% level:
+```{r}
+linearHypothesis(model5,
+                 paste("0 = year", c(1965, 1970, 1975, 1980, 1985, 1990, 1995), sep =""),
+                 test="F",
+                 vcov. = vcovHC(model5, method = "arellano", type = "HC1"))
+```
+
+
+
+#### Part e.
+
+There seems to be little effect of income on the demand for democracy, especially when demographic variables are accounted for.
