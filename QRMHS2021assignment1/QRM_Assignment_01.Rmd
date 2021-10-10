@@ -48,6 +48,33 @@ car_large_cyl_vol <- car_data %>% filter(Liter > 3)
 my_small <- car_small_cyl_vol$Liter
 my_large <- car_large_cyl_vol$Liter
 
+### Compute a t-test to test the null hypothesis for two means
+t.test(my_small, my_large, conf.level = 0.99)
+  ### We reject the null hypothesis that the population mean price of cars with a cylinder volume of more than 3 liters equals the population mean price of cars with a cylinder volume of more than 3 liters at a significance level of 0.01 as the constructed p-value is insignificant (i.e., very small)
+
+#c)
+
+price <- car_data$Price
+liter <- car_data$Liter
+
+### OLS estimation
+lm_price_liter <- lm(price ~ liter)
+
+### Import library
+library(sandwich)
+
+### Computation of heteroscedasticity-robust standard errors
+heterorob_SE <- sqrt(diag(vcovHC(lm_price_liter, type = "HC1")))
+
+### Create table
+
+### some explainng words here
+
+#d)
+
+### Plot and add prices vs. liter to regression line
+
+plot(liter, price, pch = 16, cex = 1.3, col = "blue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price") + abline(lm_price_liter)
 ```
 
 
