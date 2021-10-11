@@ -52,7 +52,6 @@ my_large <- car_large_cyl_vol$Liter
 ### Compute a t-test to test the null hypothesis for two means
 t.test(my_small, my_large, conf.level = 0.99)
 
-
   ### We reject the null hypothesis that the population mean price of cars with a cylinder volume of more than 3 liters equals the population mean price of cars with a cylinder volume of more than 3 liters at a significance level of 0.01 as the constructed p-value is insignificant (i.e., very small)
 
 #c)
@@ -90,9 +89,15 @@ heterorob_origin_SE
 #f)
 plot(liter, price, pch = 16, cex = 1.3, col = "blue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price", xlim=c(0,max(liter)), ylim = c(0, max(price))) + abline(lm_price_liter) + abline(lm_price_origin_liter, col = "grey")
 
+### A linear regression model estimated to run through the origin suggests the nonexistence of a constant, or intercept, following the assumption that such an intercept shall not conceptually apply to the data set being modeled. The linear regression model depicted in e) looks as follows (include model throug LaTeX here). The model does not include an intercept beta0. When looking at the conceptual context of the model, it is intuitive to see that an intercept should not be included. A car with no cylinder volume (liter) should have a selling price (price) of 0, as it either has no engine or is something other than a car.
+
 #g)
 
 summary(lm_price_origin_liter)
+
+anova(lm_price_liter, lm_price_origin_liter)
+
+### [...] When looking at the results of model 2, we immediately see that the regression model going trough the origin has a much higher r2-value compared to the basic linear regression model in 1. In our model in 1, the r2 is 0.32, with our regression-through-the-origin-model, the r2 rises to 0.87. A such high r2 does not automatically imply a better fit, however, it could be possible that the model is overfit. The Standard Error of Regression in model 2 is higher than in model 1, and the intercept in model 1 is significant. When looking at the ANOVA table, we can see that the RSS, which measures amount of variance in a data set that is not explained by a regression model itself, is much higher in model 2 than in model 1, and the difference -1 shows that the difference between the two models is significant. Thus, the original model 1 is more appropriate than the model going through the origin. 
 
 #h)
 
@@ -100,8 +105,12 @@ car_data_h <- select(car_data, Price, Liter, Mileage, Cruise, Sound, Leather)
 
 lm_prices_all <- lm(data = car_data_h, Price ~ .)
 
+### The underlying reason for our regression analysis is to examine the determinants of the price of second-hand cars. In our LRM 1, we examine the influence of cylinder volume on price. However, it is reasonable and logical to assume that not only cylinder volume influences the price of second-hand cars and there must be other factors that should not be included in the error term that influence the price. When looking at a car, not only the cylinder volume is important. Often, the cylinder volume is one of the less important things that create the value of a car to someone. People have different needs and expectations, some might prefer leather interior over a high cylinder volume because they enjoy the comfort. Others might want a car with low mileage because they expect it to last longer, or some extra features that facilitate driving with the car or increasing the experience such as high-quality loudspeakers especially for younger people. There are many other factors than simply cylinder volume to consider when determining the price of a second-hand car. Thus, it is reasonable and appropriate to include other variables in the regression model to examine the determinants influencing the dependent variable.
+
 #i)
 summary(lm_prices_all)
+
+### In model 1, the SER is 262, in model 3 it changes to approx. 264. The t-value decreases from 19.05 in model 1 to 14.658 in model 2. The coefficient changes from 4990.4 to 3864, thus showing that for every increase of 1 in Liter, the price has to increase by 3864 relative to 4990 in model 1. The effect of Liter on Price changed by including other variables in our linear regression model, which is logical as other factors besides Liter are existent and become more relevant in determining the price of second-hand cars. A good reason not to include Liter as a variable in our model is 
 
 #j)
 
@@ -110,6 +119,23 @@ car_data_j <- mutate(car_data_h, miles_30k = 1*(Mileage>30000))
 lm_prices_all_30kmiles <- lm(data = car_data_j, Price ~ .)
 
 summary(lm_prices_all_30kmiles)
+
+# create dummy variable
+Mileage <- car_data$Mileage
+D <- ifelse(Mileage>30000,1,0)
+
+# select values of Mileage if D==1 and compute summary statistics
+mileageD <- ifelse(D==1,Mileage,NA)
+averageD <- mean(mileageD, na.rm=TRUE)
+stddevD <- sd(mileageD, na.rm=TRUE)
+quantsD <- quantile(mileageD, probs = seq(0, 1, 0.25), na.rm = TRUE)
+
+# and similarly for when D==0         
+mileageNotD <- ifelse(D==0,Mileage,NA)
+
+summary(mileageD)
+summary(mileageNotD)
+summary(D)
 ```
 
 
