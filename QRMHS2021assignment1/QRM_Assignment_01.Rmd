@@ -12,7 +12,9 @@ output:
 library("readxl")
 library("ggplot2")
 library("sandwich")
+library("xtable")
 library("dplyr")
+
 ```
 
 ```{r, echo = F}
@@ -32,17 +34,18 @@ ggplot(car_data, aes(x=Price)) +
   scale_x_continuous(breaks = round(seq(0, 80000, by = 10000),1))
 ```
 
-The dataset at hand has `r nrow(car_data)` observations (cars) of which most are priced between 10000 and 22500. While the histogram is skeewed to the right side there are only a significant amount of cars priced between 22500 and 45000. 
+The dataset at hand has `r nrow(car_data)` observations (cars) of which most are priced between 10000 and 22500. While the histogram is skeewed to the right side there are a significant amount of cars priced between 22500 and 45000. 
 
-```{r}
-#b)
+## b)
+
+```{r, echo= FALSE, results="hide"}
 
 car_small_cyl_vol <- car_data %>% filter(Liter < 3)
 car_large_cyl_vol <- car_data %>% filter(Liter > 3)
 
   ### check whether below and above 3 liters includes all observations
   identical(nrow(car_small_cyl_vol)+nrow(car_large_cyl_vol),nrow(car_data))
-  ##returns FALSE; hence it does not include all observations
+  ##returns FALSE; hence does not include all observations
   
   ### Cars with exactly 3 liters cylinder volume should be excluded after the constraints given in the exercise
   car_between_cyl_vol <- car_data %>% filter(Liter == 3)
@@ -52,68 +55,157 @@ car_large_cyl_vol <- car_data %>% filter(Liter > 3)
 
 my_small <- car_small_cyl_vol$Liter
 my_large <- car_large_cyl_vol$Liter
-
+```
+```{r}
 ### Compute a t-test to test the null hypothesis for two means
 t.test(my_small, my_large, conf.level = 0.99)
+```
+
+We reject the null hypothesis that the population mean price of cars with a cylinder volume of more than 3 liters equals the population mean price of cars with a cylinder volume of more than 3 liters at a significance level of 0.01 as the constructed p-value is insignificant (i.e., very small)
 
 
-  ### We reject the null hypothesis that the population mean price of cars with a cylinder volume of more than 3 liters equals the population mean price of cars with a cylinder volume of more than 3 liters at a significance level of 0.01 as the constructed p-value is insignificant (i.e., very small)
-
-#c)
+## c)
+```{r, echo = FALSE, results="hide"}
 
 price <- car_data$Price
 liter <- car_data$Liter
 
 ### OLS estimation
 lm_price_liter <- lm(price ~ liter)
-
-summary(lm_price_liter)
+lm_p_l_summary <- summary(lm_price_liter)
 
 
 ### Computation of heteroscedasticity-robust standard errors
 heterorob_SE <- sqrt(diag(vcovHC(lm_price_liter, type = "HC1")))
+```
+```{r}
 heterorob_SE
+```
 
-### Create table
+```{r, echo=FALSE, results='asis'}
+table01 <- matrix(NA,2,3) 
 
-### some explainng words here
+table01[1:2,1] <- lm_price_liter$coefficients 
+table01[1:2,2] <- lm_p_l_summary$coefficients[,2]
+table01[1:2,3] <- lm_p_l_summary$coefficients[,3]
+colnames(table01) <- c("Coefficient", "Standard error", "$t$-statistic") 
+rownames(table01) <- c("$\\hat{\\beta}_0 $", "$\\hat{\\beta}_1$")
 
-#d)
+print(xtable(table01,label="tb:model1", digits=c(0,2,2,2), caption = "Regression output for: $price_i =\\hat{\\beta}_0 + \\hat{\\beta}_1 liter_i + u_i$"), sanitize.text.function = function(x){x}, comment=FALSE)
+```
+As can be seen above, the y-intercept estimate (`r "$\\hat{\\beta}_0$"`) of our linear regression line is at a price of `r round(lm_price_liter$coefficients["(Intercept)"],2)`. So our regression model estimates that a car with a cylinder volume of zero will have a price of `r round(lm_price_liter$coefficients["(Intercept)"],2)`. The slope of our regression line (`r "$\\hat{\\beta}_1$"`) is denoted by the `r round(lm_price_liter$coefficients["liter"],2)`, implying that for one additional liter of cylinder volume the price will increase by `r round(lm_price_liter$coefficients["liter"],2)`.
+
+## d)
+
+```{r,echo = FALSE, results="hide"}
+
 
 ### Plot and add prices vs. liter to regression line
 
 plot(liter, price, pch = 16, cex = 1.3, col = "blue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price") + abline(lm_price_liter)
+```
 
-#e)
 
+## e)
+
+```{r, echo = FALSE, results="hide"}
 lm_price_origin_liter <- lm(price ~ 0 + liter)
+lm_p_o_l_summary <- summary(lm_price_origin_liter)
 
 heterorob_origin_SE <- sqrt(diag(vcovHC(lm_price_origin_liter, type = "HC1")))
 heterorob_origin_SE
+```
+```{r,echo = FALSE, results = "hide", results="asis"}
+table02 <- matrix(NA,1,3) 
 
-#f)
+table02[1,1] <- lm_price_origin_liter$coefficients 
+table02[1,2] <- lm_p_o_l_summary$coefficients[,2]
+table02[1,3] <- lm_p_o_l_summary$coefficients[,3]
+colnames(table02) <- c("Coefficient", "Standard error", "$t$-statistic") 
+rownames(table02) <- c("$\\hat{\\beta}_1$")
+
+print(xtable(table02,label="tb:model1", digits=c(0,2,2,2), caption = "Regression output for: $price_i = \\hat{\\beta}_1 liter_i + u_i$"), sanitize.text.function = function(x){x}, comment=FALSE)
+
+```
+The slope estimate (`r "$\\hat{\\beta}_1$"`) of our regression line is denoted by the `r round(lm_price_origin_liter$coefficients["liter"],2)` in the table above, implying that for one additional ($liter_i$) liter of cylinder volume the price will increase by `r round(lm_price_origin_liter$coefficients["liter"],2)`.
+
+## f)
+
+```{r, echo = FALSE, results = "hide"}
 plot(liter, price, pch = 16, cex = 1.3, col = "blue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price", xlim=c(0,max(liter)), ylim = c(0, max(price))) + abline(lm_price_liter) + abline(lm_price_origin_liter, col = "grey")
 
-#g)
+```
+A linear regression model estimated to run through the origin suggests the nonexistence of a constant, or y-intercept, following the assumption that such an intercept shall not conceptually apply to the data set being modeled. The linear regression model depicted in e) looks as follows: `r "$price_i = \\hat{\\beta}_1 liter_i + u_i$"`. The model does not include an intercept `r "$\\hat{\\beta}_0$"`. When looking at the conceptual context of the model, it is intuitive to see that an intercept should not be included. A car with no cylinder volume ($liter_i$) should have a selling price ($price_i$) of 0, as it either has no engine or is something other than a car.
 
+## g)
+
+```{r, echo = FALSE, results="hide"}
 summary(lm_price_origin_liter)
 
-#h)
+anova(lm_price_liter, lm_price_origin_liter)
 
+
+```
+
+[...] When looking at the results of model 2, we immediately see that the regression model going trough the origin has a much higher $R^2$ value compared to the basic linear regression model in 1. In our model in 1, the $R^2$  is 0.32, with our regression-through-the-origin-model, the $R^2$  rises to 0.87. A such high $R^2$  does not automatically imply a better fit, however, it could be possible that the model is overfit. The Standard Error of Regression in model 2 is higher than in model 1, and the intercept in model 1 is significant. When looking at the ANOVA table, we can see that the RSS, which measures amount of variance in a data set that is not explained by a regression model itself, is much higher in model 2 than in model 1, and the difference -1 shows that the difference between the two models is significant. Thus, the original model 1 is more appropriate than the model going through the origin. 
+
+## h)
+
+```{r, echo = FALSE, results="hide"}
 car_data_h <- select(car_data, Price, Liter, Mileage, Cruise, Sound, Leather)
 
 lm_prices_all <- lm(data = car_data_h, Price ~ .)
 
-#i)
+```
+
+The underlying reason for our regression analysis is to examine the determinants of the price of second-hand cars. In our LRM 1, we examine the influence of cylinder volume on price. However, it is reasonable and logical to assume that not only cylinder volume influences the price of second-hand cars and there must be other factors that should not be included in the error term that influence the price. When looking at a car, not only the cylinder volume is important. Often, the cylinder volume is one of the less important things that create the value of a car to someone. People have different needs and expectations, some might prefer leather interior over a high cylinder volume because they enjoy the comfort. Others might want a car with low mileage because they expect it to last longer, or some extra features that facilitate driving with the car or increasing the experience such as high-quality loudspeakers especially for younger people. There are many other factors than simply cylinder volume to consider when determining the price of a second-hand car. Thus, it is reasonable and appropriate to include other variables in the regression model to examine the determinants influencing the dependent variable.
+
+## i)
+
+```{r, echo = FALSE, results="hide"}
 summary(lm_prices_all)
 
-#j)
 
+```
+In model 1, the SER is 262, in model 3 it changes to approx. 264. The t-value decreases from 19.05 in model 1 to 14.658 in model 2. The coefficient changes from 4990.4 to 3864, thus showing that for every increase of 1 in Liter, the price has to increase by 3864 relative to 4990 in model 1. The effect of Liter on Price changed by including other variables in our linear regression model, which is logical as other factors besides Liter are existent and become more relevant in determining the price of second-hand cars. A good reason not to include Liter as a variable in our model is 
+
+## j)
+
+```{r, echo = FALSE, results="hide"}
 car_data_j <- mutate(car_data_h, miles_30k = 1*(Mileage>30000))
 
 lm_prices_all_30kmiles <- lm(data = car_data_j, Price ~ .)
 
 summary(lm_prices_all_30kmiles)
+
+
+high_mileage <- filter(car_data_j, miles_30k == 1) %>% select(Mileage) %>% as.matrix()
+low_mileage <- filter(car_data_j, miles_30k == 0) %>% select(Mileage) %>% as.matrix()
+
+high_m_average <- mean(high_mileage)
+high_m_stddev <- sd(high_mileage)
+high_m_quants <- quantile(high_mileage, probs = seq(0,1,0.25))
+
+summary(high_mileage)
+summary(low_mileage)
+
+
+# create dummy variable
+Mileage <- car_data$Mileage
+D <- ifelse(Mileage>30000,1,0)
+
+# select values of Mileage if D==1 and compute summary statistics
+mileageD <- ifelse(D==1,Mileage,NA)
+averageD <- mean(mileageD, na.rm=TRUE)
+stddevD <- sd(mileageD, na.rm=TRUE)
+quantsD <- quantile(mileageD, probs = seq(0, 1, 0.25), na.rm = TRUE)
+
+# and similarly for when D==0         
+mileageNotD <- ifelse(D==0,Mileage,NA)
+
+summary(mileageD)
+summary(mileageNotD)
+summary(D)
 ```
 
 
