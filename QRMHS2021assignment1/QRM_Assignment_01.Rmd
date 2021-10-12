@@ -140,10 +140,9 @@ A linear regression model estimated to run through the origin suggests the nonex
 
 ```{r, echo = FALSE, results="hide"}
 summary(lm_price_origin_liter)
-
+```
+```{r, echo = FALSE}
 anova(lm_price_liter, lm_price_origin_liter)
-
-
 ```
 
 [...] When looking at the results of model 2, we immediately see that the regression model going trough the origin has a much higher $R^2$ value compared to the basic linear regression model in 1. In our model in 1, the $R^2$  is 0.32, with our regression-through-the-origin-model, the $R^2$  rises to 0.87. A such high $R^2$  does not automatically imply a better fit, however, it could be possible that the model is overfit. The Standard Error of Regression in model 2 is higher than in model 1, and the intercept in model 1 is significant. When looking at the ANOVA table, we can see that the RSS, which measures amount of variance in a data set that is not explained by a regression model itself, is much higher in model 2 than in model 1, and the difference -1 shows that the difference between the two models is significant. Thus, the original model 1 is more appropriate than the model going through the origin. 
@@ -154,6 +153,7 @@ anova(lm_price_liter, lm_price_origin_liter)
 car_data_h <- select(car_data, Price, Liter, Mileage, Cruise, Sound, Leather)
 
 lm_prices_all <- lm(data = car_data_h, Price ~ .)
+lm_prices_all_summary <- summary(lm_prices_all)
 
 ```
 
@@ -161,23 +161,23 @@ The underlying reason for our regression analysis is to examine the determinants
 
 ## i)
 
-```{r, echo = FALSE, results="hide"}
-summary(lm_prices_all)
-```
 
-```{r, echo = FALSE, results="hide"}
+```{r, echo = FALSE, results="asis"}
 
-table02 <- matrix(NA,1,3) 
+table03 <- matrix(NA,6,3) 
 
-table02[1,1] <- lm_price_origin_liter$coefficients 
-table02[1,2] <- lm_p_o_l_summary$coefficients[,2]
-table02[1,3] <- lm_p_o_l_summary$coefficients[,3]
-colnames(table02) <- c("Coefficient", "Standard error", "$t$-statistic") 
-rownames(table02) <- c("$\\hat{\\beta}_1$")
+table03[1:6,1] <- lm_prices_all$coefficients 
+table03[1:6,2] <- lm_prices_all_summary$coefficients[,2]
+table03[1:6,3] <- lm_prices_all_summary$coefficients[,3]
+colnames(table03) <- c("Coefficient", "Standard error", "$t$-statistic") 
+rownames(table03) <- c("$\\hat{\\beta}_0$","$\\hat{\\beta}_1$","$\\hat{\\beta}_2$","$\\hat{\\beta}_3$","$\\hat{\\beta}_4$","$\\hat{\\beta}_5$")
 
-print(xtable(table02,label="tb:model1", digits=c(0,2,2,2), caption = "Regression output for: $price_i = \\hat{\\beta}_1 liter_i + u_i$"), sanitize.text.function = function(x){x}, comment=FALSE)
+print(xtable(table03,label="tb:model1", digits=c(0,2,2,2), caption = "Regression output for: 
+             $price_i = \\hat{\\beta}_0 + \\hat{\\beta}_1 liter_i + \\hat{\\beta}_1 liter_i + \\hat{\\beta}_1 mileage_i + \\hat{\\beta}_1 cruise_i + \\hat{\\beta}_1 sound_i + \\hat{\\beta}_1 leather_i + u_i$"), sanitize.text.function = function(x){x}, comment=FALSE)
 
 ```
+
+
 
 
 In model 1, the SER is 262, in model 3 it changes to approx. 264. The t-value decreases from 19.05 in model 1 to 14.658 in model 2. The coefficient changes from 4990.4 to 3864, thus showing that for every increase of 1 in Liter, the price has to increase by 3864 relative to 4990 in model 1. The effect of Liter on Price changed by including other variables in our linear regression model, which is logical as other factors besides Liter are existent and become more relevant in determining the price of second-hand cars. A good reason not to include Liter as a variable in our model is 
@@ -201,6 +201,7 @@ high_m_quants <- quantile(high_mileage, probs = seq(0,1,0.25))
 
 summary(high_mileage)
 summary(low_mileage)
+
 
 
 # create dummy variable
