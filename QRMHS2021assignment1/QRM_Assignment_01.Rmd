@@ -1,6 +1,6 @@
 ---
 title: "QRM_Assignment_01"
-author: "Max Cordon & Linus Kaiser"
+author: "Max Kordon & Linus Kaiser"
 date: 15-10-2021
 output:
   pdf_document: default
@@ -14,7 +14,6 @@ library("ggplot2")
 library("sandwich")
 library("xtable")
 library("dplyr")
-
 ```
 
 ```{r, echo = F}
@@ -102,7 +101,7 @@ As can be seen above, the y-intercept estimate (`r "$\\hat{\\beta}_0$"`) of our 
 
 ### Plot and add prices vs. liter to regression line
 
-plot(liter, price, pch = 16, cex = 1.3, col = "blue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price") + abline(lm_price_liter)
+plot(liter, price, pch = 16, cex = 1.3, col = "lightblue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price") + abline(lm_price_liter)
 ```
 
 
@@ -132,7 +131,7 @@ The slope estimate (`r "$\\hat{\\beta}_1$"`) of our regression line is denoted b
 ## f)
 
 ```{r, echo = FALSE, results = "hide"}
-plot(liter, price, pch = 16, cex = 1.3, col = "blue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price", xlim=c(0,max(liter)), ylim = c(0, max(price))) + abline(lm_price_liter) + abline(lm_price_origin_liter, col = "grey")
+plot(liter, price, pch = 16, cex = 1.3, col = "lightblue", main = "Price plotted against Liter", xlab = "Liter", ylab = "Price", xlim=c(0,max(liter)), ylim = c(0, max(price))) + abline(lm_price_liter) + abline(lm_price_origin_liter, col = "grey")
 
 ```
 A linear regression model estimated to run through the origin suggests the nonexistence of a constant, or y-intercept, following the assumption that such an intercept shall not conceptually apply to the data set being modeled. The linear regression model depicted in e) looks as follows: `r "$price_i = \\hat{\\beta}_1 liter_i + u_i$"`. The model does not include an intercept `r "$\\hat{\\beta}_0$"`. When looking at the conceptual context of the model, it is intuitive to see that an intercept should not be included. A car with no cylinder volume ($liter_i$) should have a selling price ($price_i$) of 0, as it either has no engine or is something other than a car.
@@ -164,9 +163,23 @@ The underlying reason for our regression analysis is to examine the determinants
 
 ```{r, echo = FALSE, results="hide"}
 summary(lm_prices_all)
+```
 
+```{r, echo = FALSE, results="hide"}
+
+table02 <- matrix(NA,1,3) 
+
+table02[1,1] <- lm_price_origin_liter$coefficients 
+table02[1,2] <- lm_p_o_l_summary$coefficients[,2]
+table02[1,3] <- lm_p_o_l_summary$coefficients[,3]
+colnames(table02) <- c("Coefficient", "Standard error", "$t$-statistic") 
+rownames(table02) <- c("$\\hat{\\beta}_1$")
+
+print(xtable(table02,label="tb:model1", digits=c(0,2,2,2), caption = "Regression output for: $price_i = \\hat{\\beta}_1 liter_i + u_i$"), sanitize.text.function = function(x){x}, comment=FALSE)
 
 ```
+
+
 In model 1, the SER is 262, in model 3 it changes to approx. 264. The t-value decreases from 19.05 in model 1 to 14.658 in model 2. The coefficient changes from 4990.4 to 3864, thus showing that for every increase of 1 in Liter, the price has to increase by 3864 relative to 4990 in model 1. The effect of Liter on Price changed by including other variables in our linear regression model, which is logical as other factors besides Liter are existent and become more relevant in determining the price of second-hand cars. A good reason not to include Liter as a variable in our model is 
 
 ## j)
